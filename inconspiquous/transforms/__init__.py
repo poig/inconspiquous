@@ -6,6 +6,9 @@ from xdsl.passes import ModulePass
 def get_all_passes() -> dict[str, Callable[[], type[ModulePass]]]:
     """Returns all available passes."""
 
+    def get_inline_circuits():
+        return InlineCircuitPass
+
     def get_canonicalize():
         from xdsl.transforms import canonicalize
 
@@ -122,6 +125,7 @@ def get_all_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         return pipeline.XZSSimpl
 
     return {
+        "inline-circuits": get_inline_circuits,
         "canonicalize": get_canonicalize,
         "convert-qref-to-qssa": get_convert_qref_to_qssa,
         "convert-qssa-to-qref": get_convert_qssa_to_qref,

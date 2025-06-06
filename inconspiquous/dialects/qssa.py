@@ -1,6 +1,6 @@
 from typing import ClassVar
 from xdsl.dialects.builtin import i1
-from xdsl.ir import Dialect, Operation, SSAValue
+from xdsl.ir import Dialect, Operation, SSAValue, OpResult
 from xdsl.irdl import (
     AnyInt,
     IRDLOperation,
@@ -9,13 +9,17 @@ from xdsl.irdl import (
     irdl_op_definition,
     operand_def,
     prop_def,
+    result_def,
     traits_def,
     var_operand_def,
     var_result_def,
     eq,
+    SingleBlockRegion,
+    VarOperand,
+    region_def
 )
 from xdsl.pattern_rewriter import RewritePattern
-from xdsl.traits import HasCanonicalizationPatternsTrait
+from xdsl.traits import HasCanonicalizationPatternsTrait, IsTerminator
 
 from inconspiquous.dialects.gate import GateType
 from inconspiquous.dialects.measurement import CompBasisMeasurementAttr, MeasurementType
@@ -31,6 +35,47 @@ class GateOpHasCanonicalizationPatterns(HasCanonicalizationPatternsTrait):
         from inconspiquous.transforms.canonicalization.qssa import GateIdentity
 
         return (GateIdentity(),)
+
+
+@irdl_op_definition
+class QSSAReturnOp(IRDLOperation):
+    name = "qssa.return"
+
+    # A variable number of qubits being returned
+    qubits: VarOperand = var_operand_def(BitType)
+    
+    # The 'traits' definition is now correctly placed inside the class body
+    traits = traits_def(IsTerminator())
+
+
+@irdl_op_definition
+class QSSACircuitOp(IRDLOperation):
+    name = "qssa.circuit"
+
+    body: SingleBlockRegion = region_def()
+    gate: OpResult = result_def(GateType)
+
+    def verify_(self):
+        if not self.body.block:
+            raise Exception("qssa.circuit body cannot be empty")
+        
+        num_inputs = len(self.body.block.args)
+        for arg in self.body.block.args:
+            if not isinstance(arg.typ, BitType):
+                raise Exception("qssa.circuit arguments must be of type !qu.bit")
+        
+        terminator = self.body.block.last_op
+        if not isinstance(terminator, QSSAReturnOp):
+            raise Exception("qssa.circuit must be terminated by qssa.return")
+            
+        num_outputs = len(terminator.qubits)
+        gate_size = self.gate.typ.n.data
+
+        if not (num_inputs == num_outputs == gate_size):
+            raise Exception(f"Inconsistent qubit counts: "
+                            f"gate type has {gate_size}, "
+                            f"circuit has {num_inputs} inputs, "
+                            f"and returns {num_outputs} outputs.")
 
 
 @irdl_op_definition
