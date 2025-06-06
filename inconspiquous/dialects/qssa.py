@@ -16,7 +16,7 @@ from xdsl.irdl import (
     eq,
     SingleBlockRegion,
     VarOperand,
-    region_def
+    region_def,
 )
 from xdsl.pattern_rewriter import RewritePattern
 from xdsl.traits import HasCanonicalizationPatternsTrait, IsTerminator
@@ -43,7 +43,7 @@ class QSSAReturnOp(IRDLOperation):
 
     # A variable number of qubits being returned
     qubits: VarOperand = var_operand_def(BitType)
-    
+
     # The 'traits' definition is now correctly placed inside the class body
     traits = traits_def(IsTerminator())
 
@@ -58,24 +58,26 @@ class QSSACircuitOp(IRDLOperation):
     def verify_(self):
         if not self.body.block:
             raise Exception("qssa.circuit body cannot be empty")
-        
+
         num_inputs = len(self.body.block.args)
         for arg in self.body.block.args:
             if not isinstance(arg.typ, BitType):
                 raise Exception("qssa.circuit arguments must be of type !qu.bit")
-        
+
         terminator = self.body.block.last_op
         if not isinstance(terminator, QSSAReturnOp):
             raise Exception("qssa.circuit must be terminated by qssa.return")
-            
+
         num_outputs = len(terminator.qubits)
         gate_size = self.gate.typ.n.data
 
         if not (num_inputs == num_outputs == gate_size):
-            raise Exception(f"Inconsistent qubit counts: "
-                            f"gate type has {gate_size}, "
-                            f"circuit has {num_inputs} inputs, "
-                            f"and returns {num_outputs} outputs.")
+            raise Exception(
+                f"Inconsistent qubit counts: "
+                f"gate type has {gate_size}, "
+                f"circuit has {num_inputs} inputs, "
+                f"and returns {num_outputs} outputs."
+            )
 
 
 @irdl_op_definition
